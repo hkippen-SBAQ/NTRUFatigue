@@ -79,6 +79,10 @@ def parse_args(description, **kwds):
                         help="number of parallel experiments to run")
     parser.add_argument('-f', '--full_data', type=bool, dest="full_data", default=0,
                         help="print out full data")
+    # parser.add_argument('-d', "--distribution", type=str, dest="dist", default="discrete_gaussian",
+    #                     help="The sampling distribution for NTRU")
+    # parser.add_argument("-p", "--param", type=float, dest="dist_param_1", default=2/3.,
+    #                     help="Distribution parameter 1")
 
     args, unknown = parser.parse_known_args()
 

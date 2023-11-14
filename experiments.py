@@ -57,12 +57,13 @@ def ntru_kernel(params, seed=None):
     float_type = params["float_type"]
     circ = params["circulant"]
     tours = params["tours"]
-    sigmasq = params["sigmasq"]
+    dist = params["dist"]
+    dist_param_1 = params["dist_param_1"]
 
     if circ:
-        B, F, G = gen_ntru_instance_circulant(n, q, sigmasq, seed)
+        B, F, G = gen_ntru_instance_circulant(n, q, dist, dist_param_1, seed)
     else:
-        B, F, G = gen_ntru_instance_matrix(n, q, sigmasq, seed)
+        B, F, G = gen_ntru_instance_matrix(n, q, dist, dist_param_1, seed)
     A = IntegerMatrix.from_matrix([[int(x) for x in v] for v in B])
     M = GSO.Mat(A, float_type=float_type)
     lll = LLLReduction(M)
@@ -81,7 +82,7 @@ def ntru_kernel(params, seed=None):
 
     def insert_callback(call_stack, solution):
         kappa, b = call_stack[-1]
-        assert b==len(solution)
+        assert b == len(solution)
         # Write in cannonical basis
         v = (bkz.M.B[kappa:kappa+b]).multiply_left(solution)
         # babai-reduce it
@@ -94,8 +95,12 @@ def ntru_kernel(params, seed=None):
 
         # Test if in dense sublattice
         x = v.dot(Tfg)
-        if any(np.abs(x)>0.001): return
-        if sqnorm(v) < sk_norm_min: return
+        if any(np.abs(x) > 0.001):
+            return
+
+        if sqnorm(v) < sk_norm_min:
+            return
+
         lf = sqnorm(v) / sk_norm_max
 
         raise DenseSubLatticeFound(call_stack, lf, v, vgs, solution, bkz.M.r())
@@ -104,27 +109,27 @@ def ntru_kernel(params, seed=None):
 
     for blocksize in list(range(2, n+1)):
 
-        if tours==None:
+        if tours == None:
             tours = 8
 
         par = BKZ.Param(blocksize,
-                              strategies=BKZ.DEFAULT_STRATEGY,
-                              flags=BKZ.BOUNDED_LLL,
-                              max_loops=tours)
+                        strategies=BKZ.DEFAULT_STRATEGY,
+                        flags=BKZ.BOUNDED_LLL,
+                        max_loops=tours)
         try:
             bkz(par)
         except DenseSubLatticeFound as err:
             kappa, b = err.call_stack[0]
-            assert (b==blocksize) or (kappa+b == 2*n)
+            assert (b == blocksize) or (kappa+b == 2*n)
             subkappa, subb = err.call_stack[-1]
             vsz = np.sum(np.abs(err.vloc))
             logr = [log(x)/2. for x in err.gso]
-            d=len(err.gso)
+            d = len(err.gso)
 
             slope_part = min(30, n)
             l = n-slope_part
             r = n+slope_part
-            slope=-linregress(range(l, r), logr[l:r]).slope
+            slope = -linregress(range(l, r), logr[l:r]).slope
             byLLL = vsz<1.5
 
             sq_proj_sz = np.sum(err.vgs[kappa:kappa+b])/np.sum(err.vgs[:kappa+b])
@@ -148,8 +153,11 @@ def ntru():
                                   float_type = "double",
                                   circulant = True,
                                   tours=8,
-                                  sigmasq=0.667
+                                  dist="discrete_gaussian",
+                                  dist_param_1=0.667
                                   )
+    print(args)
+    print(all_params)
 
     stats = run_all(ntru_kernel, list(all_params.values()), # noqa
                     trials=args.trials,
