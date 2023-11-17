@@ -127,7 +127,14 @@ def parse_args(description, **kwds):
                 unknown_args[k].append(int(v))
                 continue
             except:
+                pass
+            
+            try:
+                unknown_args[k].append(float(v))
+                continue
+            except:
                 unknown_args[k].append(v)
+
 
 
         i += 1

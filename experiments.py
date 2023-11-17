@@ -22,6 +22,7 @@ from bkz2_callback import BKZReduction
 
 from cli import parse_args, run_all, pretty_dict
 from ntru_keygen import gen_ntru_instance_matrix, gen_ntru_instance_circulant
+from proba_utils import Probability_Distribution 
 
 
 def is_prime(x):
@@ -57,13 +58,21 @@ def ntru_kernel(params, seed=None):
     float_type = params["float_type"]
     circ = params["circulant"]
     tours = params["tours"]
-    dist = params["dist"]
-    dist_param_1 = params["dist_param_1"]
+    d_f = params["d_f"]
+    d_f_param = params["d_f_param"]
+    d_g = params["d_g"]
+    d_g_param = params["d_g_param"]
+
+    D_f = Probability_Distribution(d_f, d_f_param)
+    D_g = Probability_Distribution(d_g, d_g_param)
+
+    if D_f.stddev < D_g.stddev:
+        D_g, D_f = D_f, D_g
 
     if circ:
-        B, F, G = gen_ntru_instance_circulant(n, q, dist, dist_param_1, seed)
+        B, F, G = gen_ntru_instance_circulant(n, q, D_f, D_g, seed)
     else:
-        B, F, G = gen_ntru_instance_matrix(n, q, dist, dist_param_1, seed)
+        B, F, G = gen_ntru_instance_matrix(n, q, D_f, D_g, seed)
     A = IntegerMatrix.from_matrix([[int(x) for x in v] for v in B])
     M = GSO.Mat(A, float_type=float_type)
     lll = LLLReduction(M)
@@ -153,8 +162,10 @@ def ntru():
                                   float_type = "double",
                                   circulant = True,
                                   tours=8,
-                                  dist="discrete_gaussian",
-                                  dist_param_1=0.667
+                                  d_f="discrete_gaussian",
+                                  d_f_param=0.667,
+                                  d_g="discrete_gaussian",
+                                  d_g_param=0.667
                                   )
     print(args)
     print(all_params)

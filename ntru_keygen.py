@@ -1,211 +1,11 @@
 # Code adapted from:
 # https://github.com/kpatsakis/NTRU_Sage/blob/master/ntru.sage
 # Under GPL 2.0 license.
-from numpy import array, zeros, identity, block
+from numpy import zeros, identity, block
 from scipy.linalg import circulant
 from numpy.random import shuffle
-from numpy.random import choice as np_random_choice
 from numpy import random
 import numpy as np
-
-from math import factorial as fac
-from math import ceil, erf, sqrt, exp
-
-
-def build_Gaussian_law(sigma, t):
-    D = {}
-    for i in range(0, t + 1):
-        D[i] = exp(-i ** 2 / (2 * sigma ** 2))
-        D[-i] = D[i]
-    normalization = sum([D[i] for i in D])
-    for i in D:
-        D[i] = D[i] / normalization
-    assert abs(sum([D[i] for i in range(-t, t + 1)]) - 1.) <= 10 ** -10
-    return D
-
-
-def gaussian_center_weight(sigma, t):
-    """ Weight of the gaussian of std deviation s, on the interval [-t, t]
-    :param x: (float)
-    :param y: (float)
-    :returns: erf( t / (sigma*sqrt 2) )
-    """
-    return erf(t / (sigma * sqrt(2.)))
-
-
-def binomial(x, y):
-    """ Binomial coefficient
-    :param x: (integer)
-    :param y: (integer)
-    :returns: y choose x
-    """
-    try:
-        binom = fac(x) // fac(y) // fac(x - y)
-    except ValueError:
-        binom = 0
-    return binom
-
-
-def centered_binomial_pdf(k, x):
-    """ Probability density function of the centered binomial law of param k at x
-    :param k: (integer)
-    :param x: (integer)
-    :returns: p_k(x)
-    """
-    return binomial(2 * k, x + k) / 2.**(2 * k)
-
-
-def build_centered_binomial_law(k):
-    """ Construct the binomial law as a dictionnary
-    :param k: (integer)
-    :param x: (integer)
-    :returns: A dictionnary {x:p_k(x) for x in {-k..k}}
-    """
-    D = {}
-    for i in range(-k, k + 1):
-        D[i] = centered_binomial_pdf(k, i)
-    return D
-
-
-def build_uniform_law(p):
-    """ Construct the binomial law as a dictionnary
-    :param k: (integer)
-    :param x: (integer)
-    :returns: A dictionnary {x:p_k(x) for x in {-k..k}}
-    """
-    D = {}
-    for i in range(p):
-        D[i - p // 2] = 1. / p
-    return D
-
-
-def mod_switch(x, q, rq):
-    """ Modulus switching (rounding to a different discretization of the Torus)
-    :param x: value to round (integer)
-    :param q: input modulus (integer)
-    :param rq: output modulus (integer)
-    """
-    return int(round(1. * rq * x / q) % rq)
-
-
-def mod_centered(x, q):
-    """ reduction mod q, centered (ie represented in -q/2 .. q/2)
-    :param x: value to round (integer)
-    :param q: input modulus (integer)
-    """
-    a = x % q
-    if a < q / 2:
-        return a
-    return a - q
-
-
-def build_mod_switching_error_law(q, rq):
-    """ Construct Error law: law of the difference
-    introduced by switching from and back a uniform value mod q
-    :param q: original modulus (integer)
-    :param rq: intermediate modulus (integer)
-    """
-    D = {}
-    V = {}
-    for x in range(q):
-        y = mod_switch(x, q, rq)
-        z = mod_switch(y, rq, q)
-        d = mod_centered(x - z, q)
-        D[d] = D.get(d, 0) + 1. / q
-        V[y] = V.get(y, 0) + 1
-
-    return D
-
-
-def law_convolution(A, B):
-    """ Construct the convolution of two laws
-    (sum of independent variables from two input laws)
-    :param A: first input law (dictionnary)
-    :param B: second input law (dictionnary)
-    """
-
-    C = {}
-    for a in A:
-        for b in B:
-            c = a + b
-            C[c] = C.get(c, 0) + A[a] * B[b]
-    return C
-
-
-def law_product(A, B):
-    """ Construct the law of the product of independent
-    variables from two input laws
-    :param A: first input law (dictionnary)
-    :param B: second input law (dictionnary)
-    """
-    C = {}
-    for a in A:
-        for b in B:
-            c = a * b
-            C[c] = C.get(c, 0) + A[a] * B[b]
-    return C
-
-
-def clean_dist(A):
-    """ Clean a distribution to accelerate furthe
-     computation (drop element of the support
-     with proba less than 2^-300)
-    :param A: input law (dictionnary)
-    """
-    B = {}
-    for (x, y) in A.items():
-        if y > 2**(-300):
-            B[x] = y
-    return B
-
-def renormalize_dist(A):
-    B = {}
-    summ = sum([y for (x,y) in A.items()])
-    for x in A:
-        B[x] = A[x] / summ 
-    return B
-
-
-def iter_law_convolution(A, i):
-    """ compute the -ith forld convolution of a distribution (using double-and-add)
-    :param A: first input law (dictionnary)
-    :param i: (integer)
-    """
-    D = {0: 1.0}
-    i_bin = bin(i)[2:]  # binary representation of n
-    for ch in i_bin:
-        D = law_convolution(D, D)
-        D = clean_dist(D)
-        if ch == '1':
-            D = law_convolution(D, A)
-            D = clean_dist(D)
-    return D
-
-
-def tail_probability(D, t):
-    '''
-    Probability that an drawn from D is strictly greater than t in absolute value
-    :param D: Law (Dictionnary)
-    :param t: tail parameter (integer)
-    '''
-    s = 0
-    ma = max(D.keys())
-    if t >= ma:
-        return 0
-    # Summing in reverse for better numerical precision (assuming tails are decreasing)
-    for i in reversed(range(int(ceil(t)), ma)):
-        s += D.get(i, 0) + D.get(-i, 0)
-    return s
-
-def draw_from_distribution(D, shape):
-    """draw an element from the distribution D
-    :D: distribution in a dictionnary form
-    """
-    X = np_random_choice([key for key in D.keys()],
-                         1, replace=True,
-                         size=shape,
-                         p=[float(prob) for prob in D.values()])
-    return X
 
 def egcd(a, b):
     if a == 0:
@@ -271,54 +71,35 @@ def DiscreteGaussian(shape, sigmasq):
     p /= np.sum(p)
     return np.random.choice(interval, shape, p=p)
 
-
-def sample_distribution(dist, **kwargs):
-    if dist.strip().lower() == "discrete_gaussian":  # param_1 = variance
-        return DiscreteGaussian(shape=kwargs["shape"], sigmasq=kwargs["dist_param_1"])
-
-    elif dist.strip().lower() == "binomial":  # param_1 = range
-        D = build_centered_binomial_law(kwargs["dist_param_1"])
-        return np.array(draw_from_distribution(D, kwargs["shape"]))
-
-    elif dist.strip().lower() == "uniform":  # param_1 = uniform modulus
-        D = build_uniform_law(kwargs["dist_param_1"])
-        return np.array(draw_from_distribution(D, kwargs["shape"]))
-
-    elif dist.strip().lower() == "sparse_ternary":  # param_1 = sparsity
-        D = {-1: 0.5, 1: 0.5}
-        hamming_weight = round(kwargs["shape"]*kwargs["dist_param_1"])
-        return shuffle(np.array([draw_from_distribution(D, 1)[0] for _ in range(hamming_weight)]
-                                + (kwargs["shape"] - hamming_weight)*[0]))
-
-
 class NTRUEncrypt_Matrix:
 
     def gen_keys(self):
         while True:
-            F = sample_distribution(self.dist, shape=(self.n,self.n), dist_param_1=self.dist_param_1)
+            F = self.D_f.sample_distribution(shape=(self.n,self.n))
             try:
                 Finv = modinvMat(F, self.q)
                 break
             except ZeroDivisionError:
                 # print("failed inverse")
                 continue
-        
-        G = sample_distribution(self.dist, shape=(self.n,self.n), dist_param_1=self.dist_param_1)
-        H = Finv.dot(G) % self.q
+
+        G = self.D_g.sample_distribution(shape=(self.n,self.n))
+        xi = self.D_f.stddev / self.D_g.stddev
+
+        H = Finv.dot(G*xi) % self.q
         return H, F, G
 
-    def __init__(self, n, q, dist, dist_param_1):
+    def __init__(self, n, q, D_f, D_g):
         self.n = n
         self.q = q
-        self.dist = dist
-        self.dist_param_1 = dist_param_1
-
+        self.D_f = D_f
+        self.D_g = D_g
 
 class NTRUEncrypt_Circulant:
 
     def gen_keys(self):
         while True:
-            f = sample_distribution(self.dist, shape=self.n, dist_param_1=self.dist_param_1)
+            f = self.D_f.sample_distribution(shape=self.n) 
             F = circulant(f)
             try:
                 Finv = modinvMat(F, self.q)
@@ -327,16 +108,18 @@ class NTRUEncrypt_Circulant:
                 # print("failed inverse")
                 continue
 
-        g = sample_distribution(self.dist, shape=self.n, dist_param_1=self.dist_param_1)
+        g = self.D_g.sample_distribution(shape=self.n)
         G = circulant(g)
-        H = Finv.dot(G) % self.q
+        xi = self.D_f.stddev / self.D_g.stddev
+
+        H = Finv.dot(G*xi) % self.q
         return H, F, G
 
-    def __init__(self, n, q, dist, dist_param_1):
+    def __init__(self, n, q, D_f, D_g):
         self.n = n
         self.q = q
-        self.dist = dist
-        self.dist_param_1 = dist_param_1
+        self.D_f = D_f
+        self.D_g = D_g
 
 class NTRUEncrypt:
 
@@ -375,16 +158,16 @@ def build_ntru_lattice(n, q, H):
                    [     H            , identity(n, dtype="long") ] ])
     return lambd
 
-def gen_ntru_instance_matrix(n, q, dist, dist_param_1, seed=None):
+def gen_ntru_instance_matrix(n, q, D_f, D_g, seed=None):
     random.seed(np.uint32(seed))
-    ntru = NTRUEncrypt_Matrix(n, q, dist, dist_param_1)
+    ntru = NTRUEncrypt_Matrix(n, q, D_f, D_g)
     H, F, G = ntru.gen_keys()
     B = build_ntru_lattice(n, q, H)
     return B, F, G
 
-def gen_ntru_instance_circulant(n, q, dist, dist_param_1, seed=None):
+def gen_ntru_instance_circulant(n, q, D_f, D_g, seed=None):
     random.seed(np.uint32(seed))
-    ntru = NTRUEncrypt_Circulant(n, q, dist, dist_param_1)
+    ntru = NTRUEncrypt_Circulant(n, q, D_f, D_g)
     H, F, G = ntru.gen_keys()
     B = build_ntru_lattice(n, q, H)
     return B, F, G
