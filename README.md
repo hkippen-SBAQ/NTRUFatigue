@@ -64,6 +64,10 @@ Parameters:
 --workers X / -w X   # use X parallel threads (default 1)
 --float_type X       # use floating point type X in {double, ld, dd, qd} for GSO in fplll. (Default "double")
 --full_data X / -f X # show full data in CSV format (default 0)
+--d_f X              # Distribution of f ("discrete_gaussian", "binomial", "uniform", or "sparse_ternary")
+--d_f_param X        # Parameter for distribution of f
+--d_g X              # Distribution of g ("discrete_gaussian", "binomial", "uniform", or "sparse_ternary")
+--d_g_param X        # Parameter for distribution of g
 ```
 Precision needs to be increased with n and q. Increase it if you encounter the infamous "infinte loop in Babai" error message. Using "dd" and "qd" requires the library `libqd` before compilation and installation of fplll/fpylll.
 
