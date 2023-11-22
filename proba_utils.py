@@ -227,6 +227,12 @@ class Probability_Distribution:
         elif self.dist_name == "uniform":  # param_1 = uniform modulus
             self.D = build_uniform_law(self.param)
 
+        elif self.dist_name == "sparse_ternary":
+            if self.param < 1:
+                self.param = round(self.param*self.dim)
+
+            self.D = None
+
         else:
             self.D = None
 
