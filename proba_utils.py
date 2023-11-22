@@ -213,9 +213,10 @@ def average_variance(D):
 
 class Probability_Distribution:
 
-    def __init__(self, dist_name, param):
+    def __init__(self, dist_name, param, dim=None):
         self.dist_name = dist_name.strip().lower()
         self.param = param
+        self.dim = dim
 
         if self.dist_name == "discrete_gaussian":  # param_1 = variance
             self.D = build_Gaussian_law(np.sqrt(self.param), round(10*np.sqrt(self.param)))
@@ -237,14 +238,14 @@ class Probability_Distribution:
             D = {-1: 0.5, 1: 0.5}
             try:
                 n, m = shape
-                hamming_weight = round(n*m*self.param)
-                return shuffle(np.array([draw_from_distribution(D, 1)[0] for _ in range(hamming_weight)]
-                                    + ((n*m) - hamming_weight)*[0])).reshape(shape)
+                arr = np.array([draw_from_distribution(D, 1)[0] for _ in range(self.param)]
+                                    + ((n*m) - self.param)*[0]).reshape(shape)
+                shuffle(arr)
+                return arr
 
             except:
-                hamming_weight = round(shape*self.param)
-                arr = np.array([draw_from_distribution(D, 1)[0] for _ in range(hamming_weight)]
-                               + (shape - hamming_weight)*[0])
+                arr = np.array([draw_from_distribution(D, 1)[0] for _ in range(self.param)]
+                               + (shape - self.param)*[0])
                 shuffle(arr)
                 return arr
 
@@ -258,7 +259,7 @@ class Probability_Distribution:
             return np.sqrt(variance)
 
         elif self.D is None and self.dist_name == "sparse_ternary":
-            return np.sqrt(self.param)
+            return np.sqrt(self.param/self.dim)
 
         else:
             raise NotImplementedError(f"Distribution: {self.dist_name} not supported!")

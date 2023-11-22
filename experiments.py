@@ -63,8 +63,13 @@ def ntru_kernel(params, seed=None):
     d_g = params["d_g"]
     d_g_param = params["d_g_param"]
 
-    D_f = Probability_Distribution(d_f, d_f_param)
-    D_g = Probability_Distribution(d_g, d_g_param)
+    if circ:
+        D_f = Probability_Distribution(d_f, d_f_param, n)
+        D_g = Probability_Distribution(d_g, d_g_param, n)
+
+    else:
+        D_f = Probability_Distribution(d_f, d_f_param, n*n)
+        D_g = Probability_Distribution(d_g, d_g_param, n*n)
 
     if D_f.stddev < D_g.stddev:
         D_g, D_f = D_f, D_g

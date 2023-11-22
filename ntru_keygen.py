@@ -86,8 +86,8 @@ class NTRUEncrypt_Matrix:
         G = self.D_g.sample_distribution(shape=(self.n,self.n))
         xi = self.D_f.stddev / self.D_g.stddev
 
-        H = Finv.dot(G*xi) % self.q
-        return H, F, G
+        H = Finv.dot(G) % self.q
+        return H, F, G, xi
 
     def __init__(self, n, q, D_f, D_g):
         self.n = n
@@ -99,7 +99,7 @@ class NTRUEncrypt_Circulant:
 
     def gen_keys(self):
         while True:
-            f = self.D_f.sample_distribution(shape=self.n) 
+            f = self.D_f.sample_distribution(shape=self.n)
             F = circulant(f)
             try:
                 Finv = modinvMat(F, self.q)
@@ -112,8 +112,8 @@ class NTRUEncrypt_Circulant:
         G = circulant(g)
         xi = self.D_f.stddev / self.D_g.stddev
 
-        H = Finv.dot(G*xi) % self.q
-        return H, F, G
+        H = Finv.dot(G) % self.q
+        return H, F, G, xi
 
     def __init__(self, n, q, D_f, D_g):
         self.n = n
@@ -152,24 +152,24 @@ class NTRUEncrypt:
         self.Df = Df
         self.Dg = Dg
 
-def build_ntru_lattice(n, q, H):
+def build_ntru_lattice(n, q, H, xi):
 
     lambd = block([[q * identity(n, dtype="long") , zeros((n, n), dtype="long") ],
-                   [     H            , identity(n, dtype="long") ] ])
+                   [     H            , xi*identity(n, dtype="long") ] ])
     return lambd
 
 def gen_ntru_instance_matrix(n, q, D_f, D_g, seed=None):
     random.seed(np.uint32(seed))
     ntru = NTRUEncrypt_Matrix(n, q, D_f, D_g)
-    H, F, G = ntru.gen_keys()
-    B = build_ntru_lattice(n, q, H)
+    H, F, G, xi = ntru.gen_keys()
+    B = build_ntru_lattice(n, q, H, xi)
     return B, F, G
 
 def gen_ntru_instance_circulant(n, q, D_f, D_g, seed=None):
     random.seed(np.uint32(seed))
     ntru = NTRUEncrypt_Circulant(n, q, D_f, D_g)
-    H, F, G = ntru.gen_keys()
-    B = build_ntru_lattice(n, q, H)
+    H, F, G, xi = ntru.gen_keys()
+    B = build_ntru_lattice(n, q, H, xi)
     return B, F, G
 
 def gen_ntru_instance(n, q, Df=None, Dg=None, seed=None):
