@@ -245,9 +245,9 @@ class Probability_Distribution:
             try:
                 n, m = shape
                 arr = np.array([draw_from_distribution(D, 1)[0] for _ in range(self.param)]
-                                    + ((n*m) - self.param)*[0]).reshape(shape)
+                                    + ((n*m) - self.param)*[0])
                 shuffle(arr)
-                return arr
+                return arr.reshape(shape)
 
             except:
                 arr = np.array([draw_from_distribution(D, 1)[0] for _ in range(self.param)]
